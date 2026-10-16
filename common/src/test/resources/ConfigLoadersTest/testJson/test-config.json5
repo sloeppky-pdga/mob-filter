@@ -64,7 +64,13 @@
         skylightLevel: [ 10, 20 ],
         moonPhase: [ 3, 4, 5],
         weather: [ 'RAIN', 'THUNDER'],
-        random: .45
+        random: .45,
+        scoreboard: {
+          holder: "Steve",
+          objective: "mob_kills",
+          operator: ">",
+          value: 0
+        }
       }
     }
   ]

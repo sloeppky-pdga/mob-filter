@@ -1,15 +1,12 @@
 plugins {
 	id 'net.neoforged.moddev'
 	id 'com.modrinth.minotaur'
-	id 'com.matthewprenger.cursegradle'
+	id 'net.darkhax.curseforgegradle'
 }
 
-sourceCompatibility = JavaVersion.VERSION_21
-targetCompatibility = JavaVersion.VERSION_21
-
-archivesBaseName = project.archives_base_name_neoforge
-version = project.mod_version
-group = project.maven_group
+base {
+	archivesName = project.archives_base_name_neoforge
+}
 
 repositories {
 	mavenCentral()
@@ -18,100 +15,79 @@ repositories {
 }
 
 neoForge {
-    version = project.neoforge_version
-    
-    runs {
-        client {
-            type = "client"
-            gameDirectory = file("${project.projectDir}/run")
-        }
-        server {
-            type = "server"
-            gameDirectory = file("${project.projectDir}/run")
-        }
-    }
-    mods {
-        mobfilter {
-            sourceSet sourceSets.main
-            // Also include common module for resources and classes
-            sourceSet project(":common").sourceSets.main
-        }
-    }
+	version = project.neoforge_version
+
+	runs {
+		client {
+			type = "client"
+			gameDirectory = file("${project.projectDir}/run")
+		}
+		server {
+			type = "server"
+			gameDirectory = file("${project.projectDir}/run")
+		}
+	}
+
+	mods {
+		mobfilter {
+			sourceSet sourceSets.main
+			sourceSet project(":common").sourceSets.main
+		}
+	}
 }
 
 dependencies {
 	// Use the compiled common jar - it has proper Mojang mappings from Loom
 	implementation project(":common")
-    compileOnly "org.spongepowered:mixin:${project.spongepowered_version}"
-    annotationProcessor "org.spongepowered:mixin:${project.spongepowered_version}:processor"
-}
-
-tasks.withType(JavaCompile).configureEach {
-	it.options.release = 21
 }
 
 processResources {
-	inputs.property "version", project.version
-
+	// Insert current project versions into the NeoForge metadata
+	inputs.property "project.version", project.version
+	inputs.property "minecraft_version", project.minecraft_version
+	inputs.property "neoforge_version", project.neoforge_version
 	filesMatching("META-INF/neoforge.mods.toml") {
-		filter { line ->
-			line.replace('${version}', project.version.toString())
-		}
+		expand(
+			"mod_version": project.version,
+			"minecraft_version": project.minecraft_version,
+			"neoforge_version": project.neoforge_version
+		)
 	}
-}
-
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(21)
-	}
-	withSourcesJar()
 }
 
 jar {
 	from("LICENSE") {
-		rename { "${it}_${project.archivesBaseName}"}
+		rename { "${it}_${project.archives_base_name_neoforge}"}
 	}
-	
-	// Include common classes directly in the jar
-	from(project(":common").sourceSets.main.output) {
-		duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-	}
+	from(project(":common").sourceSets.main.output)
 }
-
-
 
 // Publishing configuration
 modrinth {
 	token = System.getenv("MODRINTH_TOKEN")
-	projectId = "${project.modrinth_projectId}"
+	projectId = project.modrinth_projectId
 	versionNumber = project.mod_version
+	versionName = "${project.mod_version} (neoforge)"
 	versionType = "release"
 	uploadFile = jar
-	changelog = "<p><a href='https://github.com/pcal43/${project.github_projectId}/releases/tag/${project.mod_version}'>https://github.com/pcal43/${project.github_projectId}/releases/tag/${project.mod_version}</a></p>"
-	gameVersions = ["${project.minecraft_version}"]
+	changelog = "<p><a href='${project.github_projectUrl}/releases/tag/${project.mod_version}'>${project.github_projectUrl}/releases/tag/${project.mod_version}</a></p>"
+	gameVersions = [ project.minecraft_version ]
 	loaders = ["neoforge"]
 }
 
-curseforge {
-	apiKey = System.getenv("CURSEFORGE_TOKEN") ?: 'CURSEFORGE_TOKEN NOT_SET'
+import net.darkhax.curseforgegradle.TaskPublishCurseForge
 
-	project {
-		id = "${project.curseforge_projectId}"
-		releaseType = "release"
-		changelog = "https://github.com/pcal43/${project.github_projectId}/releases/tag/${project.mod_version}"
-		changelogType = "markdown"
-		mod_version = project.mod_version
-		addGameVersion ((String) project.minecraft_version)
-		addGameVersion "NeoForge"
-		mainArtifact(jar)
+tasks.register('publishCurseForge', TaskPublishCurseForge) {
+	// API Key from environment or fallback
+	apiToken = System.getenv("CURSEFORGE_TOKEN") ?: 'CURSEFORGE_TOKEN NOT_SET'
 
-		afterEvaluate {
-			uploadTask.dependsOn("jar")
-		}
-	}
-
-	options {
-		forgeGradleIntegration = false
-	}
+	def mainFile = upload(project.curseforge_projectId, jar)
+	mainFile.releaseType = "release"
+	mainFile.changelog = "${project.github_projectUrl}/releases/tag/${project.mod_version}"
+	mainFile.changelogType = "markdown"
+	mainFile.addGameVersion(project.minecraft_version)
+	mainFile.addModLoader("NeoForge")
+	mainFile.addEnvironment("Server")
+	// Ensure jar is finished before this runs
+	dependsOn(jar)
 }
-

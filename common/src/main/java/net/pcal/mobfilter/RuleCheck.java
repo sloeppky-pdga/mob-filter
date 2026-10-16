@@ -2,7 +2,7 @@ package net.pcal.mobfilter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.MobCategory;
@@ -27,7 +27,7 @@ interface RuleCheck {
     record DimensionCheck(IdMatcher dimensionMatcher) implements RuleCheck {
         @Override
         public boolean isMatch(final SpawnAttempt att) {
-            final ResourceLocation dimensionId = att.getDimensionId();
+            final Identifier dimensionId = att.getDimensionId();
             if (dimensionId == null) {
                 att.getLogger().debug(() -> "[MobFilter] DimensionCheck: dimension ID could not be determined for " + att.getEntityType() + ", assuming match");
                 return true;
@@ -42,7 +42,7 @@ interface RuleCheck {
     record BiomeCheck(IdMatcher biomeMatcher) implements RuleCheck {
         @Override
         public boolean isMatch(final SpawnAttempt att) {
-            final ResourceLocation biomeId = att.getBiomeId();
+            final Identifier biomeId = att.getBiomeId();
             if (biomeId == null) {
                 att.getLogger().debug(() -> "[MobFilter] BiomeCheck: biome ID could not be determined for " + att.getEntityType() + ", assuming match");
                 return true;
@@ -89,7 +89,7 @@ interface RuleCheck {
     record EntityIdCheck(IdMatcher entityMatcher) implements RuleCheck {
         @Override
         public boolean isMatch(final SpawnAttempt att) {
-            final ResourceLocation entityId = att.getEntityId();
+            final Identifier entityId = att.getEntityId();
             final boolean isMatch;
             if (entityId == null) {
                 att.getLogger().debug(() -> "[MobFilter] EntityIdCheck: entity ID could not be determined for " + att.getEntityType() + ", assuming match");
@@ -105,7 +105,7 @@ interface RuleCheck {
     record BlockIdCheck(IdMatcher blockMatcher) implements RuleCheck {
         @Override
         public boolean isMatch(final SpawnAttempt att) {
-            final ResourceLocation blockId = att.getBlockId();
+            final Identifier blockId = att.getBlockId();
             final boolean isMatch;
             if (blockId == null) {
                 att.getLogger().debug(() -> "[MobFilter] BlockIdCheck: block ID could not be determined for " + att.getEntityType() + ", assuming match");
@@ -303,6 +303,47 @@ interface RuleCheck {
                 isMatch = worldNames.isMatch(worldName);
             }
             att.getLogger().trace(() -> "[MobFilter] WorldNameCheck: " + worldName + " in " + worldNames + " " + isMatch);
+            return isMatch;
+        }
+    }
+
+    record ScoreboardCheckConfig(
+        String holder,
+        String objective,
+        String operator,
+        Integer value) {
+    }
+
+    record ScoreboardCheck(ScoreboardCheckConfig match) implements RuleCheck {
+        @Override
+        public boolean isMatch(final SpawnAttempt att) {
+            String holder = match.holder;
+            String objective = match.objective;
+            String operator = match.operator.strip();
+            Integer testValue = match.value;
+            Integer value = att.getScoreboardValue(holder, objective);
+            if (value == null) {
+                att.getLogger().debug(() -> "[MobFilter] ScoreboardCheck: no value returned for holder " + holder + " objective " + objective + ", assuming match");
+                return ConfigService.get().getDefaultRuleCheckResult();
+            }
+            boolean isMatch;
+            if (operator.equals("=")) {
+                isMatch = value.equals(testValue);
+            } else if (operator.equals("!=")) {
+                isMatch = !value.equals(testValue);
+            } else if (operator.equals("<")) {
+                isMatch = value < testValue;
+            } else if (operator.equals(">")) {
+                isMatch = value > testValue;
+            } else if (operator.equals("<=")) {
+                isMatch = value <= testValue;
+            } else if (operator.equals(">=")) {
+                isMatch = value >= testValue;
+            } else {
+                att.getLogger().debug(() -> "[MobFilter] ScoreboardCheck: unknown operator \"" + operator + "\"");
+                isMatch = false;
+            }
+            att.getLogger().trace(() -> "[MobFilter] ScoreboardCheck: holder " + holder + " objective " + objective + " value " + value + " is " + operator + " test value " + testValue + "? " + isMatch);
             return isMatch;
         }
     }

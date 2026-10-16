@@ -160,6 +160,17 @@ True if a freshly-generated random number is less than this value.
 list of net.minecraft.entity.EntitySpawnReason values.  The condition is true
 when the mob is being spawned due to one of the listed reasons.
 
+#### `scoreboard`
+*Only available in version `0.28.1+26.2` and greater.*
+A dictionary containing the following values:
+
+|value    |description                                                                  |examples    |
+|---------|-----------------------------------------------------------------------------|------------|
+|holder   |The entity holding the objective value                                       |`"Steve"`   |
+|objective|The name of the scoreboard objective                                         |`"mob_kills"`|
+|operator |The logical operator to compare with. One of "=","!=",">","<",">=", or "<=".|`"="`,`">"`|
+|value    |The reference value to compare against.                                      |`100`       |
+
 As of Minecraft 1.21.3, valid values are:
 - `NATURAL`
 - `CHUNK_GENERATION`
